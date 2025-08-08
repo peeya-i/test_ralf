@@ -128,6 +128,7 @@ class Ralf:
             props = torch.cuda.get_device_properties(0)
             self.gpu_ram_gb = round(props.total_memory / (1024 ** 3), 2)
         self.ram_gb = round(psutil.virtual_memory().total / (1024 ** 3), 2)
+        """
 
         print(f"GPU available: {self.gpu_available}")
         if self.gpu_available:
@@ -135,7 +136,6 @@ class Ralf:
             print(f"GPU name: {self.gpu_name}")
             print(f"GPU RAM: {self.gpu_ram_gb} GB")
         print(f"Available system RAM: {self.ram_gb} GB")
-        """
 
         self.golden_dataset = None
         self.platinum_dataset = None
@@ -244,6 +244,9 @@ class Ralf:
         print("Label mapping:", self.label_to_id)
 
     def load_and_configure_model(self): # Removed model_name argument
+    # When we start to train / fine-tune models, we will most-likely send the config and data to
+    # another container running the training process. If it is in the cloud, it can be turn up and shut down
+    # as needed to reduce the cost of ownership.
         ''' """
         Loads a pre-trained model and configures it for sequence classification with LoRA.
 
@@ -415,16 +418,20 @@ class Ralf:
     def recommend(self, input_csv_file,
                 source_col,
                 target_col,
-                ):
+                analysis,
+                model_selected = "gpt-4o-mini"):
         """Recommends top 3 LLMs for fine-tuning and a golden dataset based on problem type and resources using GPT-4o-mini or Gemini."""
 
-        gpu_available = self.gpu_available
-        gpu_ram_gb = self.gpu_ram_gb
-        ram_gb = self.ram_gb
+        # gpu_available = self.gpu_available
+        # gpu_ram_gb = self.gpu_ram_gb
+        # ram_gb = self.ram_gb
+        gpu_available = 16
+        gpu_ram_gb = 128
+        ram_gb = 256
 
         if self.open_api_key:
             client = OpenAI(api_key=self.open_api_key)
-            model_to_use = "gpt-4o-mini" # Or another suitable OpenAI model
+            model_to_use = model_selected # Or another suitable OpenAI model
             print("Using OpenAI API for recommendations.")
         elif self.gemini_key:
              # Need to implement Gemini API calls if Gemini key is provided
@@ -445,21 +452,8 @@ class Ralf:
             dataset_df = pd.DataFrame(columns=["Name", "URL", "Source Column", "Target Column"])
             return llm_df, dataset_df, "Error: Neither OpenAI nor Gemini API key provided (should have been caught in initialization)."
 
-
-        # Get the problem type analysis
-        try:
-            analysis = self.analyze_problem_type(pd.read_csv(input_csv_file), source_col, target_col)
-            if not isinstance(analysis, dict):
-                 llm_df = pd.DataFrame(columns=["Name", "Hugging Face URL", "Model ID", "Parameters"])
-                 dataset_df = pd.DataFrame(columns=["Name", "URL", "Source Column", "Target Column"])
-                 return llm_df, dataset_df, analysis # Return error from analyze_problem_type
-            problem_types = analysis.get('types', [])
-            reasoning = analysis.get('reasoning', 'No reasoning provided.')
-        except Exception as e:
-             llm_df = pd.DataFrame(columns=["Name", "Hugging Face URL", "Model ID", "Parameters"])
-             dataset_df = pd.DataFrame(columns=["Name", "URL", "Source Column", "Target Column"])
-             return llm_df, dataset_df, f"Error during problem type analysis: {e}"
-
+        problem_types = analysis.get('types', [])
+        reasoning = analysis.get('reasoning', 'No reasoning provided.')
 
         # Prompt for LLM recommendations and Hugging Face links
         llm_recommendation_prompt = (
@@ -568,7 +562,7 @@ class Ralf:
            return llm_df, dataset_df, f"Error calling API: {e}"
 
 
-    def analyze_problem_type(self, df, source_col, target_col):
+    def analyze_problem_type(self, df, source_col, target_col, model_selected = "gpt-4o-mini"):
         """Analyze the problem type using GPT-4o-mini based on selected columns."""
         print("Entering Problem Type Analysis")
         # Take a sample of 5 rows for context
@@ -594,7 +588,7 @@ class Ralf:
         # Use the appropriate client and model based on available keys
         if self.open_api_key:
             client = OpenAI(api_key=self.open_api_key)
-            model_to_use = "gpt-4o-mini"
+            model_to_use = model_selected
         elif self.gemini_key:
             # Placeholder for Gemini implementation
             # import google.generativeai as genai
@@ -614,13 +608,10 @@ class Ralf:
                 max_tokens=256,
                 temperature=0.1,
             )
-            print("2")
             # Try to extract JSON from the response
             content = response.choices[0].message.content
             # Find the first {...} block in the response
-            print("3")
             match = re.search(r'\{.*\}', content, re.DOTALL)
-            print("4")
             if match:
                 return json.loads(match.group(0))
             # Fallback: try to parse the whole content
