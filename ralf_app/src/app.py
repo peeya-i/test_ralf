@@ -31,7 +31,7 @@ if selected_tab == "Setup":
     show_sysinfo = False
     if st.button("Get System Info"):
         if openai_key:
-            ralf = Ralf(OPENAI_API_KEY=openai_key, GEMINI_API_KEY=gemini_key, HF_TOKEN=hf_token)
+            ralf.set_keys(OPENAI_API_KEY=openai_key, GEMINI_API_KEY=gemini_key, HF_TOKEN=hf_token)
             show_sysinfo = True
         else:
             st.warning("Please enter your OPENAI_API_KEY.")
@@ -63,6 +63,8 @@ if selected_tab == "Setup":
         st.session_state["target_col"] = target_col
         st.session_state["uploaded_file"] = uploaded_file
         uploaded_file
+        print("Updated file")
+    print("End of Setup")
 
 elif selected_tab == "Recommendation":
     st.header("Recommendation")
@@ -74,18 +76,18 @@ elif selected_tab == "Recommendation":
         csv_file = st.session_state["uploaded_file"]    
         columns = df.columns.tolist()
 
-        source_col, target_col = "source", "target"
+#        source_col, target_col = "source", "target"
         analysis = ralf.analyze_problem_type(df, source_col, target_col)
 
         # Display the stored results
-        display(Markdown(f"# Recommendation Results for {csv_file}:"))
+        print(f"# Recommendation Results for {csv_file}:")
 
-        display(Markdown("## Problem Type Analysis"))
+        st.write("## Problem Type Analysis")
         if isinstance(analysis, dict):
             types = analysis.get('types', [])
-            display(Markdown(f"**Types:** {', '.join(types)}"))
-            display(Markdown("**Reasoning:**"))
-            display(Markdown(analysis.get("reasoning", "No reasoning provided.")))
+            st.write(f"**Types:** {', '.join(types)}")
+            st.write("**Reasoning:**")
+            st.write(analysis.get("reasoning", "No reasoning provided."))
 
         llm_recommendations_df, dataset_recommendation_df, analysis_result = ralf.recommend(
             input_csv_file=csv_file,
@@ -93,18 +95,18 @@ elif selected_tab == "Recommendation":
             target_col=target_col)
 
         print("\nRecommended Open Source LLMs for Fine-tuning:")
-        display(llm_recommendations_df)
+        # st.write(llm_recommendations_df)
 
         print("\nRecommended Golden Dataset:")
-        display(dataset_recommendation_df)
+        # st.write(dataset_recommendation_df)
 
         print("\nProblem Type Analysis:")
         if isinstance(analysis_result, dict):
-            display(Markdown(f"**Types:** {', '.join(analysis_result.get('types', []))}"))
-            display(Markdown("**Reasoning:**"))
-            display(Markdown(analysis_result.get("reasoning", "No reasoning provided.")))
+            st.write(f"**Types:** {', '.join(analysis_result.get('types', []))}")
+            st.write("**Reasoning:**")
+            st.write(analysis_result.get("reasoning", "No reasoning provided."))
         else:
-            display(Markdown(analysis_result))
+            st.write(analysis_result)
     else:
         st.info("Please complete the Setup tab first.")
 

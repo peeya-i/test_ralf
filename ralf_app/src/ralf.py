@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import pickle
 import warnings
-import torch
+# import torch
 import psutil  # Add this import
 
 import openai
@@ -12,7 +12,7 @@ import re
 
 warnings.filterwarnings("ignore")  # Ignore warnings for cleaner output
 
-from peft import LoraConfig, get_peft_model
+# from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer, DataCollatorWithPadding, AutoTokenizer, AutoConfig
 from transformers.trainer_callback import TrainerCallback
 from sklearn.model_selection import train_test_split
@@ -114,6 +114,12 @@ class Ralf:
 
 
         # Hardware checks
+        self.gpu_available = None
+        self.gpu_count = None
+        self.gpu_name = None
+        self.gpu_ram_gb = None
+        self.ram_gb = round(psutil.virtual_memory().total / (1024 ** 3), 2)
+        """
         self.gpu_available = torch.cuda.is_available()
         self.gpu_count = torch.cuda.device_count() if self.gpu_available else 0
         self.gpu_name = torch.cuda.get_device_name(0) if self.gpu_available else None
@@ -129,7 +135,7 @@ class Ralf:
             print(f"GPU name: {self.gpu_name}")
             print(f"GPU RAM: {self.gpu_ram_gb} GB")
         print(f"Available system RAM: {self.ram_gb} GB")
-
+        """
 
         self.golden_dataset = None
         self.platinum_dataset = None
@@ -238,7 +244,7 @@ class Ralf:
         print("Label mapping:", self.label_to_id)
 
     def load_and_configure_model(self): # Removed model_name argument
-        """
+        ''' """
         Loads a pre-trained model and configures it for sequence classification with LoRA.
 
         Args:
@@ -265,6 +271,7 @@ class Ralf:
         self.model.print_trainable_parameters()
 
         print(f"Model loading and LoRA setup completed for '{self.model_name}'.")
+        '''
 
     def initialize_trainer(self, output_dir: str = "./results", save_path: str = "ralf_state.pkl"):
         """
@@ -563,6 +570,7 @@ class Ralf:
 
     def analyze_problem_type(self, df, source_col, target_col):
         """Analyze the problem type using GPT-4o-mini based on selected columns."""
+        print("Entering Problem Type Analysis")
         # Take a sample of 5 rows for context
         sample_df = df[[source_col, target_col]].dropna().sample(n=min(200, len(df)), random_state=42)
         sample_text = sample_df.to_csv(index=False)
@@ -598,6 +606,7 @@ class Ralf:
             return "Error: No API key provided for analysis."
 
 
+        print("Sending data to LLM for analysis")
         try:
             response = client.chat.completions.create(
                 model=model_to_use,
@@ -605,10 +614,13 @@ class Ralf:
                 max_tokens=256,
                 temperature=0.1,
             )
+            print("2")
             # Try to extract JSON from the response
             content = response.choices[0].message.content
             # Find the first {...} block in the response
+            print("3")
             match = re.search(r'\{.*\}', content, re.DOTALL)
+            print("4")
             if match:
                 return json.loads(match.group(0))
             # Fallback: try to parse the whole content
